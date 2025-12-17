@@ -1,0 +1,8 @@
+W-A-S-D        BARAYE HAREKAT
+ARROW_KEYS     BARAYE DIVAR KAASHTAN
+
+1. yek "n" bedin.
+2. ru safhe ei ke baaz mishe yebar ba mouse click konid, bad baa control hayii ke bala neveshtim bazi ro shuru konin.
+
+
+** in dar hadde Prototype bude, alan ba ham timim dobare az faze 1 shuru kardim 🥲 **
