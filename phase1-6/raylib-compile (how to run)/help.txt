@@ -1,0 +1,6 @@
+in do ta folder (include va src) ro bebarin tu harja .c darin
+
+ino tu terminal benevisin:
+"gcc p2.c -o p2 -I .\include -L .\lib -lraylib -lopengl32 -lgdi32 -lwinmm"
+bejaye "p2.c" esme file .c bashe; be delkhah
+bejaye "p2" esme file .exe khoruji bashe; be delkhah
