@@ -31,7 +31,7 @@
 #define COLOR_FREE_WAY BLACK
 #define COLOR_NOT_WALL WHITE
 #define COLOR_WALL MAGENTA
-#define COLOR_TEMP_WALL VIOLET
+const Color COLOR_TEMP_WALL = {0, 241, 241, 255};
 #define COLOR_RUNNER BLUE
 const Color COLOR_RUNNER_ACTIVE = {0, 241, 241, 255};
 #define COLOR_HUNTER RED
@@ -695,6 +695,19 @@ void warnMove()
     sleep(1);
 }
 
+void DrawGlowCircle(int x, int y, float r, Color core)
+{
+    for (int k = 6; k >= 1; k--)
+    {
+        float rr = r + k*3;
+        Color c = core;
+        c.a = 20;
+        DrawCircle(x, y, rr, c);
+    }
+
+    DrawCircle(x, y, r, core);
+}
+
 void drawMap(int rows, int cols, Entity gameboard[rows][cols], int hWalls[rows][cols], int vWalls[rows][cols], int maxTempWallCount, TempWall tempWalls[maxTempWallCount], int runnerCount, Player players[runnerCount], int activeRunner, Prize prize)
 {
     for (int i = 0; i!=rows; i++)
@@ -715,7 +728,7 @@ void drawMap(int rows, int cols, Entity gameboard[rows][cols], int hWalls[rows][
             if (gameboard[i][j].type != TYPE_GOAL)
                 DrawCircleLines(j*ONE_UNIT + ONE_UNIT/2, i*ONE_UNIT + ONE_UNIT/2, ONE_UNIT/2.5, cellColor);
             else
-                DrawCircle(j*ONE_UNIT + ONE_UNIT/2, i*ONE_UNIT + ONE_UNIT/2, ONE_UNIT/2, cellColor);
+                DrawGlowCircle(j*ONE_UNIT + ONE_UNIT/2, i*ONE_UNIT + ONE_UNIT/2, ONE_UNIT/2, cellColor);
 
             if (prize.active && prize.i == i && prize.j == j)
             {
