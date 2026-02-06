@@ -74,129 +74,80 @@ typedef struct
     int j;
     int active;
 } Prize;
-
 typedef struct
 {
     int rows;
     int cols;
-
-    int goalY, goalX;
-
+    
+    int goalY;
+    int goalX;
+    
     int runnerCount;
     int hunterCount;
-
+    
     int activeRunner;
     int isPlayerTurn;
-
     char difficulty;
-
+    
     int maxTempWalls;
     int tempWallsCap;
-
+    
     Prize prize;
-
+    
     Entity gameboard[10][10];
     int hWalls[10][10];
     int vWalls[10][10];
-
+    
     Player players[64];
+
+    int wallCount;
+    
     TempWall tempWalls[256];
 } SavedData;
 
-int saveGame(int rows, int cols, Entity gameboard[rows][cols], int hWalls[rows][cols], int vWalls[rows][cols], int goalY, int goalX, int runnerCount, Player players[runnerCount], int hunterCount, int activeRunner, int isPlayerTurn, char difficulty, int maxTempWalls, int tempWallsCap, TempWall tempWalls[tempWallsCap], Prize prize)
+int saveGame(int rows, int cols, int goalY, int goalX, int runnerCount, int hunterCount, int activeRunner, int isPlayerTurn, char difficulty, int maxTempWalls, int tempWallsCap, Prize prize, Entity gameboard[rows][cols], int hWalls[rows][cols], int vWalls[rows][cols], Player players[runnerCount], int wallCount, TempWall tempWalls[maxTempWalls])
 {
-    SavedData s = {0};
+    FILE* f = NULL;
+    SavedData s;
 
     s.rows = rows;
     s.cols = cols;
     s.goalY = goalY;
     s.goalX = goalX;
-
     s.runnerCount = runnerCount;
     s.hunterCount = hunterCount;
-
     s.activeRunner = activeRunner;
     s.isPlayerTurn = isPlayerTurn;
     s.difficulty = difficulty;
-
     s.maxTempWalls = maxTempWalls;
     s.tempWallsCap = tempWallsCap;
-
     s.prize = prize;
-
     for (int i = 0; i!=rows; i++)
+    {
         for (int j = 0; j!=cols; j++)
         {
             s.gameboard[i][j] = gameboard[i][j];
             s.hWalls[i][j] = hWalls[i][j];
             s.vWalls[i][j] = vWalls[i][j];
         }
-
+    }
     for (int i = 0; i!=runnerCount; i++)
         s.players[i] = players[i];
 
-    for (int i = 0; i!=tempWallsCap; i++)
+    s.wallCount = wallCount;
+
+    for (int i = 0; i!=maxTempWalls; i++)
         s.tempWalls[i] = tempWalls[i];
 
-    FILE* f = fopen("data.bin", "wb");
+    f = fopen("data.bin", "wb");
     if (f)
     {
-        size_t wrote = fwrite(&s, sizeof(SavedData), 1, f);
+        fwrite(&s, sizeof(SavedData), 1, f);
         fclose(f);
         return 1;
     }
-    else
-        return 0;
+    return 0;
 }
-int loadGame(int* rows, int* cols, Entity gameboard[10][10], int hWalls[10][10], int vWalls[10][10], int* goalY, int* goalX, int* runnerCount, Player players[64], int* hunterCount, int* activeRunner, int* isPlayerTurn, char* difficulty, int* maxTempWalls, int* tempWallsCap, TempWall tempWalls[256], Prize* prize)
-{
-    FILE* f = fopen("data.bin", "rb");
-    SavedData s;
-    if (f)
-    {
-        fread(&s, sizeof(SavedData), 1, f);
-        fclose(f);
-    }
-    else
-        return 0;
-
-
-    *rows = s.rows;
-    *cols = s.cols;
-
-    *goalY = s.goalY;
-    *goalX = s.goalX;
-
-    *runnerCount = s.runnerCount;
-    *hunterCount = s.hunterCount;
-
-    *activeRunner = s.activeRunner;
-    *isPlayerTurn = s.isPlayerTurn;
-
-    *difficulty = s.difficulty;
-
-    *maxTempWalls = s.maxTempWalls;
-    *tempWallsCap = s.tempWallsCap;
-
-    *prize = s.prize;
-
-    for (int i = 0; i!=(*rows); i++)
-        for (int j = 0; j!=(*cols); j++)
-        {
-            gameboard[i][j] = s.gameboard[i][j];
-            hWalls[i][j] = s.hWalls[i][j];
-            vWalls[i][j] = s.vWalls[i][j];
-        }
-
-    for (int i = 0; i!=(*runnerCount); i++)
-        players[i] = s.players[i];
-
-    for (int i = 0; i!=(*tempWallsCap); i++)
-        tempWalls[i] = s.tempWalls[i];
-
-    return 1;
-}
-
 
 int max(int a, int b)
 {
@@ -457,7 +408,7 @@ void moveHuntersX(int rows, int cols, Entity gameboard[rows][cols], int hWalls[r
         int jMe = enemies[h].j;
 
         int targetI = -1; int targetJ = -1;
-        float minExDist = 1000000.0;
+        float minExDist = 1000000.0f; 
 
         for (int p = 0; p!=runnerCount; p++)
         {
@@ -817,6 +768,19 @@ void warnMove()
     sleep(1);
 }
 
+void DrawGlowCircle(int x, int y, float r, Color core)
+{
+    for (int k = 6; k >= 1; k--)
+    {
+        float rr = r + k*3;
+        Color c = core;
+        c.a = 20;
+        DrawCircle(x, y, rr, c);
+    }
+
+    DrawCircle(x, y, r, core);
+}
+
 int strCount(const char* pattern, const char* s)
 {
     int final = 0;
@@ -853,27 +817,14 @@ void drawInfo(int maxTempWallCount, TempWall tempWalls[maxTempWallCount])
     int remaining = maxTempWallCount - used;
 
     char msg[1024];
-    sprintf(msg, "W to go up\nA to go left\nS to go down\nD to go right\nSPACE to pass\n\nARR_UP to place temp wall up\nARR_LEFT to place temp wall left\nARR_DOWN to place temp wall down\nARR_RIGHT to place temp wall right\n\nTemp walls remaining: %d/%d\n\n'k' to save and exit\n't' to return back to game\n\nNOTE: YOUR SAVE WOULD BE DELETED VIA\n 'WINNING' OR 'STARTING A NEW GAME.'", remaining, maxTempWallCount);
+    sprintf(msg, "W to go up\nA to go left\nS to go down\nD to go right\nSPACE to pass\n\nARR_UP to place temp wall up\nARR_LEFT to place temp wall left\nARR_DOWN to place temp wall down\nARR_RIGHT to place temp wall right\n\nTemp walls remaining: %d/%d\n\n'k' to save and exit\n't' to return back to game\n\nNOTE: YOUR SAVE WOULD BE DELETED\nVIA 'WINNING' OR 'STARTING A NEW GAME.'", remaining, maxTempWallCount);
 
-    const int fontSize = 24;
+    const int fontSize = 19;
     int countOfLines = strCount("\n", msg) + 1;
     int textHeight = countOfLines * fontSize;
 
     ClearBackground(BLACK);
     DrawText(msg, 0, 0, fontSize, RAYWHITE);
-}
-
-void DrawGlowCircle(int x, int y, float r, Color core)
-{
-    for (int k = 6; k >= 1; k--)
-    {
-        float rr = r + k*3;
-        Color c = core;
-        c.a = 20;
-        DrawCircle(x, y, rr, c);
-    }
-
-    DrawCircle(x, y, r, core);
 }
 
 void drawMap(int rows, int cols, Entity gameboard[rows][cols], int hWalls[rows][cols], int vWalls[rows][cols], int maxTempWallCount, TempWall tempWalls[maxTempWallCount], int runnerCount, Player players[runnerCount], int activeRunner, Prize prize)
@@ -1059,114 +1010,127 @@ int main()
 {
     FILE* f = NULL;
     srand(time(NULL));
+    
+    int activeRunnerSave = 0; int COLSSave; int ROWSSave; Entity GAMEBOARDSave[10][10]; int hWallsSave[10][10]; int vWallsSave[10][10]; int maxTempWallsSave; int tempWallsCapSave; TempWall* tempWallsSave = NULL; Prize prizeSave; int goalYSave; int goalXSave; int runnerCountSave; int hunterCountSave; int wallCountSave; char difficultySave; Player* playersSave = NULL;
 
-    // save related
     int loadedFromSave = 0;
-    int savedRows = 0; int savedCols = 0; Entity savedBoard[10][10]; int savedHWalls[10][10]; int savedVWalls[10][10]; int savedGoalY = -1; int savedGoalX = -1; int savedRunnerCount = 0; Player savedPlayers[64]; int savedHunterCount = 0; int savedActiveRunner = 0; int savedIsPlayerTurn = 1; char savedDifficulty = 'e'; int savedMaxTempWalls = 0; int savedTempWallsCap = 0; TempWall savedTempWalls[256]; Prize savedPrize;
-    // get save if possible
     f = fopen("data.bin", "rb");
     if (f)
     {
-        fclose(f);
-        
-        printf("\n\n\nSAVED FILE LOCATED.\n");
-        while (1)
+        printf("\033[0;31m");
+        printf("NOTE: STARTING A NEW GAME WOULD DELETE YOUR SAVE.\n");
+        printf("\033[0m");
+        while(1)
         {
+            printf("'c' to continue, 'n' to start a new game: \n");
             char choice;
-            printf("\033[0;31m");
-            printf("NOTE: IF YOU START A NEW GAME, YOUR PROGRESS WOULD BE DELETED IN ORDER TO KEEP THE GAME FAIR.\n");
-            printf("\033[0m");
-            printf("('n' to start new, 'c' to continue): ");
             scanf(" %c", &choice);
             if (choice == 'c')
-            {
-                int didLoad = loadGame(&savedRows, &savedCols, savedBoard, savedHWalls, savedVWalls, &savedGoalY, &savedGoalX, &savedRunnerCount, savedPlayers, &savedHunterCount, &savedActiveRunner, &savedIsPlayerTurn, &savedDifficulty, &savedMaxTempWalls, &savedTempWallsCap, savedTempWalls, &savedPrize);
-                if (didLoad)
-                {
-                    loadedFromSave = 1;
-                    break;
-                }
-                printf("LOADING FAILED. STARTING NEW GAME.\n");
                 break;
-            }
             if (choice == 'n')
             {
-                remove("./data.bin");
-                break;
+                fclose(f);
+                goto startNewGame;
             }
         }
-    }
-    int w; int h; int ROWS; int COLS; Entity (*GAMEBOARD)[10] = NULL; int (*hWalls)[10] = NULL; int (*vWalls)[10] = NULL; int goalY; int goalX; int runnerCount; int hunterCount; char difficulty; int activeRunner; int isPlayerTurn; Prize prize; int maxTempWalls; int tempWallsCap; TempWall* tempWalls = NULL; Player* players = NULL;
+        // load game
+        SavedData* s = (SavedData*)malloc(sizeof(SavedData));
+        fread(s, sizeof(SavedData), 1, f);
+        fclose(f);
+        activeRunnerSave = s->activeRunner;
+        COLSSave = s->cols;
+        ROWSSave = s->rows;
+        for (int i = 0; i!=10; i++)
+        {
+            for (int j = 0; j!=10; j++)
+            {
+                GAMEBOARDSave[i][j] = s->gameboard[i][j];
+                hWallsSave[i][j] = s->hWalls[i][j];
+                vWallsSave[i][j] = s->vWalls[i][j];
+            }
+        }
+        maxTempWallsSave = s->maxTempWalls;
+        tempWallsCapSave = s->tempWallsCap;
 
+
+        tempWallsSave = (TempWall*)malloc(tempWallsCapSave * sizeof(TempWall));
+        for (int i = 0; i!=tempWallsCapSave; i++)
+            tempWallsSave[i] = s->tempWalls[i];
+        
+        prizeSave = s->prize;
+        goalYSave = s->goalY;
+        goalXSave = s->goalX;
+        runnerCountSave = s->runnerCount;
+        hunterCountSave = s->hunterCount;
+        wallCountSave = s->wallCount;
+        difficultySave = s->difficulty;
+
+        playersSave = (Player*)malloc(runnerCountSave * sizeof(Player));
+        for (int i = 0; i!=runnerCountSave; i++)
+            playersSave[i] = s->players[i];
+
+        loadedFromSave = 1;
+        free(s);
+    }
+    else
+        loadedFromSave = 0;
+startNewGame:
+    if (!loadedFromSave)
+        remove("./data.bin");
+            
+    int w; int h;
     if (loadedFromSave)
     {
-        ROWS = savedRows;
-        COLS = savedCols;
-
-        GAMEBOARD = malloc(sizeof(Entity[10][10]));
-        hWalls = malloc(sizeof(int[10][10]));
-        vWalls = malloc(sizeof(int[10][10]));
-
-        memcpy(GAMEBOARD, savedBoard, sizeof(Entity[10][10]));
-        memcpy(hWalls, savedHWalls, sizeof(int[10][10]));
-        memcpy(vWalls, savedVWalls, sizeof(int[10][10]));
-
-        goalY = savedGoalY;
-        goalX = savedGoalX;
-
-        runnerCount = savedRunnerCount;
-        hunterCount = savedHunterCount;
-
-        activeRunner = savedActiveRunner;
-        isPlayerTurn = savedIsPlayerTurn;
-        difficulty = savedDifficulty;
-
-        maxTempWalls = savedMaxTempWalls;
-        tempWallsCap = savedTempWallsCap;
-
-        tempWalls = malloc(sizeof(TempWall) * tempWallsCap);
-        for (int i = 0; i!=tempWallsCap; i++)
-            tempWalls[i] = savedTempWalls[i];
-
-        players = malloc(sizeof(Player) * runnerCount);
-        for (int i = 0; i!=runnerCount; i++)
-            players[i] = savedPlayers[i];
-
-        prize = savedPrize;
-
-        w = COLS;
-        h = ROWS;
+        w = COLSSave;
+        h = ROWSSave;
     }
-    // else
-    else
+    // get inputs
+    if (!loadedFromSave)
     {
-        // get inputs
-        GAMEBOARD = malloc(sizeof(Entity[10][10]));
-        hWalls = malloc(sizeof(int[10][10]));
-        vWalls = malloc(sizeof(int[10][10]));
         while (1)
         {
             printf("ENTER n AND m RESPECTIVELY (both in {6, 7, 8, 9, 10}): ");
             scanf("%d %d", &w, &h);
-            if (6<=w && w<=10 && 6<=h && h<=10)
-            {
-                COLS = w;
-                ROWS = h;
-                maxTempWalls = max(min(ROWS, COLS)/3, 1);
-                tempWallsCap = maxTempWalls + 20;
-                if (!loadedFromSave)
-                {
-                    tempWalls = malloc(sizeof(TempWall) * tempWallsCap);
-                    for (int i = 0; i!=tempWallsCap; i++)
-                        tempWalls[i] = (TempWall){-1, -1, TYPE_WALL_H, 0};
-                }
-
-                break;
-            }
             printf("\n");
+            if (6<=w && w<=10 && 6<=h && h<=10) break;
         }
-        /* NOTE 1.0 */
-        prize = (Prize){-1, -1, 0};
+    }
+    /* NOTE 1.0 */
+    const int ROWS = (!loadedFromSave) ? h : ROWSSave; const int COLS = (!loadedFromSave) ? w : COLSSave;
+
+    Entity GAMEBOARD[ROWS][COLS]; // hunter or runner or goal
+    int hWalls[ROWS][COLS]; // 0 or 1
+    int vWalls[ROWS][COLS]; // 0 or 1
+    int maxTempWalls = (!loadedFromSave) ? max(min(ROWS, COLS)/3, 1) : maxTempWallsSave;
+    int tempWallsCap = (!loadedFromSave) ? maxTempWalls + 20 : tempWallsCapSave;
+    TempWall tempWalls[tempWallsCap];
+
+    for (int i = 0; i!=tempWallsCap; i++)
+        tempWalls[i] = (TempWall){-1, -1, TYPE_WALL_H, -1};
+    Prize prize = (Prize){-1, -1, 0};
+    if (loadedFromSave)
+    {
+        for (int i = 0; i!=ROWS; i++)
+        {
+            for (int j = 0; j!=COLS; j++)
+            {
+                GAMEBOARD[i][j] = GAMEBOARDSave[i][j];
+                hWalls[i][j] = hWallsSave[i][j];
+                vWalls[i][j] = vWallsSave[i][j];
+            }
+        }
+
+        maxTempWalls = maxTempWallsSave;
+        tempWallsCap = tempWallsCapSave;
+
+        for (int i = 0; i!=tempWallsCap; i++)
+            tempWalls[i] = tempWallsSave[i];
+
+        free(tempWallsSave);
+        prize = prizeSave;
+    }
+    if (!loadedFromSave)
+    {
         // init board to TYPE_FREE_WAY
         for (int i = 0; i!=ROWS; i++)
         {
@@ -1178,31 +1142,37 @@ int main()
                 vWalls[i][j] = 0;
             }
         }
-        // TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP
-        // haste nur location
-        goalY = -1;
-        goalX = -1;
-        goalY = rand() % ROWS;
-        goalX = rand() % COLS;
-        
+    }
+    // TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP
+    // haste nur location
+    int goalY = (!loadedFromSave) ? rand() % ROWS : goalYSave;
+    int goalX = (!loadedFromSave) ? rand() % COLS : goalXSave;
+    
+    if (!loadedFromSave)
         GAMEBOARD[goalY][goalX].type = TYPE_GOAL;
-        // ints
-        runnerCount = 1;
-        hunterCount = 1;
-        int wallCount;
-        difficulty = 'e';
-        int firstTimeRunner = 1;
-        int firstTimeHunter = 1;
-        int firstTimeWall = 1;
-    redo1:
+    // ints
+    int runnerCount = (!loadedFromSave) ? 1 : runnerCountSave;
+    int hunterCount = (!loadedFromSave) ? 1 : hunterCountSave;
+    int wallCount;
+    if (loadedFromSave)
+        wallCount = wallCountSave;
+    char difficulty;
+    if (loadedFromSave)
+        difficulty = difficultySave;
+    int firstTimeRunner = 1;
+    int firstTimeHunter = 1;
+    int firstTimeWall = 1;
+redo1:
+    if (!loadedFromSave)
+    {
         // runner count + placement
         if (firstTimeRunner)
         {
             while (1)
             {
                 printf("HOW MANY RUNNERS: "); scanf("%d", &runnerCount); printf("\n");
-                if (runnerCount<=(int)(sqrt(h*w)-2)-1 && runnerCount>0) break;
-                printf("\nMAXIMUM RUNNERS: %d\n", (int)(sqrt(h*w)-2)-1);
+                if (runnerCount<=(int)(sqrt(ROWS*COLS)-2)-1 && runnerCount>0) break;
+                printf("\nMAXIMUM RUNNERS: %d\n", (int)(sqrt(ROWS*COLS)-2)-1);
             }
         }
         firstTimeRunner = 0;
@@ -1263,14 +1233,14 @@ int main()
             while (1)
             {
                 printf("HOW MANY HUNTERS: "); scanf("%d", &hunterCount); printf("\n");
-                if (hunterCount<=(int)(sqrt(h*w)-2)-1 && hunterCount>0) break;
-                printf("\nMAXIMUM HUNTERS: %d\n", (int)(sqrt(h*w)-2)-1);
+                if (hunterCount<=(int)(sqrt(ROWS*COLS)-2)-1 && hunterCount>0) break;
+                printf("\nMAXIMUM HUNTERS: %d\n", (int)(sqrt(ROWS*COLS)-2)-1);
             }
             scanf("%c", &difficulty);
             difficulty = 'h';
             while (1)
             {
-                printf("\n\n\n\n\nCHOOSE DIFFICULTY ('e' for easy, 'h' for hard): "); scanf("%c", &difficulty); printf("\n");
+                printf("\n\n\n\n\nCHOOSE DIFFICULTY ('e' for easy, 'h' for hard): "); scanf(" %c", &difficulty); printf("\n");
                 if (difficulty == 'e' || difficulty == 'h') break;
                 printf("\nCHOOSE 'e' for easy, or 'h' for hard\n");
             }
@@ -1279,12 +1249,8 @@ int main()
         while (1)
         {
             for (int i = 0; i!=ROWS; i++)
-            {
                 for (int j = 0; j!=COLS; j++)
-                {
                     if (GAMEBOARD[i][j].type==TYPE_HUNTER) GAMEBOARD[i][j].type=TYPE_FREE_WAY;
-                }
-            }
             for (int i = 0; i!=hunterCount; i++)
             {
                 int hunterI; int hunterJ;
@@ -1313,11 +1279,11 @@ int main()
             int distOk = 1;
             // 3
             // [0, 0, 2, 4, 2, 2]
-            for (int i = 0; i<2*hunterCount && distOk; i+=2)
+            for (int i = 0; i<2*hunterCount; i += 2)
             {
-                for (int j = 2; j<2*hunterCount; j+=2)
+                for (int j = i+2; j<2*hunterCount; j += 2)
                 {
-                    if (eucDist(positions[i], positions[i+1], positions[i+j], positions[i+j+1])<2)
+                    if (eucDist(positions[i], positions[i+1], positions[j], positions[j+1]) < 2)
                     {
                         distOk = 0;
                         break;
@@ -1326,7 +1292,6 @@ int main()
             }
             if (distOk) break;
         }
-        
         // wall count + placement
         /* NOTE 1.2 */
         if (firstTimeWall)
@@ -1350,7 +1315,7 @@ int main()
                     printf("\n\n\n\n\n\n\n\n\nOUTTA HERE\n\n");
                     printf("\033[0m");
                     sleep(2);
-                    goto done;
+                    return 0;
                 }
                 wallTries++;
             }
@@ -1426,20 +1391,26 @@ int main()
         }
         if (!distOk) goto redo1;
         // end final check
-        // END TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP
     }
+    // END TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP TEMP
+    
     // init
     const int screenWidth = w*ONE_UNIT;
     const int screenHeight = h*ONE_UNIT;
-    SetTraceLogLevel(LOG_NONE);
     InitWindow(screenWidth, screenHeight, "RUNNERS VS HUNTERS");
     SetTargetFPS(MAX_FPS);
     printf("\n\n\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO\nPRESS 't' TO SEE INFO");
 
     // set players
+    Player players[runnerCount];
+    if (loadedFromSave)
+    {
+        for (int i = 0; i!=runnerCount; i++)
+                players[i] = playersSave[i];
+        free(playersSave);
+    }
     if (!loadedFromSave)
     {
-        players = malloc(sizeof(Player) * runnerCount);
         int pCursor = 0;
         for (int i = 0; i!=ROWS; i++)
         {
@@ -1455,7 +1426,6 @@ int main()
     }
     // end set players
 
-
     // DEBUG
     // for (int i = 0; i!=ROWS; i++)
     // {
@@ -1469,35 +1439,14 @@ int main()
     // }
     // END DEBUG
 
-    if (!loadedFromSave)
-    {
-        activeRunner = 0;
-        isPlayerTurn = 1;
-    }
+    int activeRunner = (!loadedFromSave) ? 0 : activeRunnerSave;
+    int isPlayerTurn = 1;
     int showInfo = 0;
-    if (!loadedFromSave)
-        spawnPrize(ROWS, COLS, GAMEBOARD, hWalls, vWalls, maxTempWalls, tempWalls, &prize);
+    spawnPrize(ROWS, COLS, GAMEBOARD, hWalls, vWalls, maxTempWalls, tempWalls, &prize);
     while (!WindowShouldClose())
     {
         // inputs
-        if (IsKeyPressed(KEY_T))
-                showInfo = (showInfo+1) % 2;
-        if (showInfo && IsKeyPressed(KEY_K))
-        {
-            while (1)
-            {
-                int didSave = saveGame(ROWS, COLS, GAMEBOARD, hWalls, vWalls, goalY, goalX, runnerCount, players, hunterCount, activeRunner, isPlayerTurn, difficulty, maxTempWalls, tempWallsCap, tempWalls, prize);
-                if (didSave)
-                {
-                    showText("SAVED BRO. NOW BYEB YE.", COLOR_RUNNER_ACTIVE);
-                    goto done;
-                }
-                else
-                    showText("SAVING FAILED. RETRYING...", RED);
-            }
-        }
-
-        if (!showInfo && isPlayerTurn && players[activeRunner].state != STATE_ALIVE)
+        if (isPlayerTurn && players[activeRunner].state != STATE_ALIVE)
         {
             activeRunner++;
             if (activeRunner >= runnerCount)
@@ -1506,13 +1455,30 @@ int main()
                 activeRunner = 0;
             }
         }
-        if (!showInfo && isPlayerTurn && players[activeRunner].state == STATE_ALIVE)
+        if (isPlayerTurn && players[activeRunner].state == STATE_ALIVE)
         {
             int i = activeRunner;
             int moved = 0;
             int gotExtraTurn = 0;
 
-            if (IsKeyPressed(KEY_W))
+            if (IsKeyPressed(KEY_T))
+                showInfo = (showInfo + 1) % 2;
+            
+            else if (showInfo && IsKeyPressed(KEY_K))
+            {
+                while (1)
+                {
+                    int didSave = saveGame(ROWS, COLS, goalY, goalX, runnerCount, hunterCount, activeRunner, isPlayerTurn, difficulty, maxTempWalls, tempWallsCap, prize, GAMEBOARD, hWalls, vWalls, players, wallCount, tempWalls);
+                    if (didSave)
+                    {
+                        showText("SAVED BRO. NOW BYEB YE.", COLOR_RUNNER_ACTIVE);
+                        goto done;
+                    }
+                    else
+                        showText("SAVING FAILED. RETRYING...", RED);
+                }
+            }
+            else if (!showInfo && IsKeyPressed(KEY_W))
             {
                 if (boundCheck(ROWS, COLS, GAMEBOARD, hWalls, vWalls, players[i].i, players[i].j, 'W', maxTempWalls, tempWalls))
                 {
@@ -1531,7 +1497,7 @@ int main()
                     }
                 } else warnMove();
             } 
-            else if (IsKeyPressed(KEY_A))
+            else if (!showInfo && IsKeyPressed(KEY_A))
             {
                 if (boundCheck(ROWS, COLS, GAMEBOARD, hWalls, vWalls, players[i].i, players[i].j, 'A', maxTempWalls, tempWalls))
                 {
@@ -1550,7 +1516,7 @@ int main()
                     }
                 } else warnMove();
             } 
-            else if (IsKeyPressed(KEY_S))
+            else if (!showInfo && IsKeyPressed(KEY_S))
             {
                 if (boundCheck(ROWS, COLS, GAMEBOARD, hWalls, vWalls, players[i].i, players[i].j, 'S', maxTempWalls, tempWalls))
                 {
@@ -1569,7 +1535,7 @@ int main()
                     }
                 } else warnMove();
             } 
-            else if (IsKeyPressed(KEY_D))
+            else if (!showInfo && IsKeyPressed(KEY_D))
             {
                 if (boundCheck(ROWS, COLS, GAMEBOARD, hWalls, vWalls, players[i].i, players[i].j, 'D', maxTempWalls, tempWalls))
                 {
@@ -1589,7 +1555,7 @@ int main()
                 } else warnMove();
             }
             // tempwalls
-            else if (IsKeyPressed(KEY_UP))
+            else if (!showInfo && IsKeyPressed(KEY_UP))
             {
                 if (boundCheck(ROWS, COLS, GAMEBOARD, hWalls, vWalls, players[i].i, players[i].j, 'W', maxTempWalls, tempWalls))
                 {
@@ -1620,7 +1586,7 @@ int main()
                     }
                 } else warnMove();
             }
-            else if (IsKeyPressed(KEY_LEFT))
+            else if (!showInfo && IsKeyPressed(KEY_LEFT))
             {
                 if (boundCheck(ROWS, COLS, GAMEBOARD, hWalls, vWalls, players[i].i, players[i].j, 'A', maxTempWalls, tempWalls))
                 {
@@ -1651,7 +1617,7 @@ int main()
                     }
                 } else warnMove();
             }
-            else if (IsKeyPressed(KEY_DOWN))
+            else if (!showInfo && IsKeyPressed(KEY_DOWN))
             {
                 if (boundCheck(ROWS, COLS, GAMEBOARD, hWalls, vWalls, players[i].i, players[i].j, 'S', maxTempWalls, tempWalls))
                 {
@@ -1682,7 +1648,7 @@ int main()
                     }
                 } else warnMove();
             }
-            else if (IsKeyPressed(KEY_RIGHT))
+            else if (!showInfo && IsKeyPressed(KEY_RIGHT))
             {
                 if (boundCheck(ROWS, COLS, GAMEBOARD, hWalls, vWalls, players[i].i, players[i].j, 'D', maxTempWalls, tempWalls))
                 {
@@ -1713,7 +1679,7 @@ int main()
                     }
                 } else warnMove();
             }
-            else if (IsKeyPressed(KEY_SPACE))
+            else if (!showInfo && IsKeyPressed(KEY_SPACE))
                 moved = 1;
 
             // PRIZE CHECK
@@ -1756,9 +1722,7 @@ int main()
         }
 
         // logic
-        int gameState = 0;
-        if (!showInfo)
-            gameState = logic(ROWS, COLS, GAMEBOARD, hWalls, vWalls, &isPlayerTurn, maxTempWalls, tempWalls, runnerCount, players, difficulty);
+        int gameState = logic(ROWS, COLS, GAMEBOARD, hWalls, vWalls, &isPlayerTurn, maxTempWalls, tempWalls, runnerCount, players, difficulty);
         if (gameState == 1 || gameState == -1)
         {
             if (gameState == 1)
@@ -1783,12 +1747,6 @@ int main()
 
 done:    
     CloseWindow();
-    if (tempWalls) free(tempWalls);
-    if (players) free(players);
-    if (GAMEBOARD) free(GAMEBOARD);
-    if (hWalls) free(hWalls);
-    if (vWalls) free(vWalls);
-
     return 0;
 }
 
@@ -1796,10 +1754,6 @@ done:
 /* NOTE 1.0 */
 /* ma az karbar "w" va "h" ro migirim. matrixi ke be vojud miarim tabe e (2n-1) ast (be jaye "n", 
 "w" ya "h" mishine). chera? chon darim: n ta block + (n-1) ta divar */
-/* EDIT: NOTE 1.0 */
-/* save ke umad kollan hazf shodan */
-
-
 
 /* NOTE 1.1 */
 /* farzan w=3 va h=3, matrix chandXchand? 5X5. hala agar karbar bege "runner" bere (1, 1), tu matrix
