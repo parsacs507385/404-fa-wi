@@ -1044,11 +1044,11 @@ redo1:
         int distOk = 1;
         // 3
         // [0, 0, 2, 4, 2, 2]
-        for (int i = 0; i<2*hunterCount && distOk; i+=2)
+        for (int i = 0; i<2*runnerCount; i += 2)
         {
-            for (int j = 2; j<2*hunterCount; j+=2)
+            for (int j = i+2; j<2*runnerCount; j += 2)
             {
-                if (eucDist(positions[i], positions[i+1], positions[i+j], positions[i+j+1])<2)
+                if (eucDist(positions[i], positions[i+1], positions[j], positions[j+1]) < 2)
                 {
                     distOk = 0;
                     break;
@@ -1066,7 +1066,7 @@ redo1:
         while (1)
         {
             printf("HOW MANY WALLS: "); scanf("%d", &wallCount);
-            if (wallCount<=(int)(0.6*ROWS*COLS-1)-15 && wallCount>=0) break;
+            if (wallCount<=(int)(0.6*ROWS*COLS-1)-18 && wallCount>=0) break;
             if (wallTries==0)
                 printf("\n\n\n\n\n\n\n\n\nMAXIMUM WALLS: %d\n\n", (int)(0.6*ROWS*COLS-1)-18);
             else if (wallTries==1)
